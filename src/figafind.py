@@ -57,13 +57,14 @@ def __filter_process_wrapper(kwargs):
 	caching_level = kwargs['caching_level']
 	sleep_before_login = kwargs['sleep_before_login']
 	members = kwargs['members']
+	fb = kwargs['fb']
 	
 	return __filter_process(email, password, human_emulation_enabled, caching_level,
-							sleep_before_login, members)
+							sleep_before_login, members, fb)
 	
 	
 def __filter_process(email, password, human_emulation_enabled, caching_level, 
-					sleep_before_login, members):
+					sleep_before_login, members, fb):
 						
 	# Tenere sincronizzata descrizone dei parametri con quella di htmlfbapi.Facebook.__init__()
 	# Tenere sincronizzato sleep_before_login con la docstring di Group.get_members() di htmfbapi
@@ -98,25 +99,31 @@ def __filter_process(email, password, human_emulation_enabled, caching_level,
 		members: list
 			Lista dei profili da controllare, ci si aspetta che il formato dei 
 			profili sia quello del return di htmlfbapi.get_group().get_members()
+		
+		fb: htmlfbapi.Facebook
+			In fb si può specificare un oggetto Facebook già esistente se si ha,
+			per evitare un nuovo login.
+			Se è None, verrà creato un nuovo oggetto
 	"""
 	
 	logger.info("Avviata la ricerca delle ragazze, profili da controllare: %s", len(members))
 	
-	# XXX Se c'è solo un processo, riutilizzare il browser aperto
-	# TODO Riutilizzarlo in tutti i casi, tanto non serve più nel processo principale
-	logger.info("Creando un nuovo browser per il processo")
-
-	# TODO Usare human emulation
-	logger.info("Aspettando %ss prima del login", sleep_before_login)
-	time.sleep(sleep_before_login)
+	if fb == None:
+		logger.info("Creando un nuovo browser per il processo")
 	
-	# TODO Usare finestre del browser
-	# Usiamo un nuovo browser per ogni processo, non si può usare lo stesso con
-	# più processi contemporaneamente perché da un qualche errore se si usa https
-	fb = htmlfbapi.Facebook(email, password, human_emulation_enabled, caching_level)
+		# TODO Usare human emulation
+		logger.info("Aspettando %ss prima del login", sleep_before_login)
+		time.sleep(sleep_before_login)
+		
+		# TODO Usare finestre del browser
+		# Usiamo un nuovo browser per ogni processo, non si può usare lo stesso con
+		# più processi contemporaneamente perché da un qualche errore se si usa https
+		fb = htmlfbapi.Facebook(email, password, human_emulation_enabled, caching_level)
+	else:
+		logger.info("Il browser è stato riutilizato")
 
 	# Creiamo il filtro
-	filter_ = fbfilter.FbFilter(filter_rules.FigaFind(), email, password, fb)
+	filter_ = fbfilter.FbFilter(filter_rules.FigaFind(), email, password, fb=fb)
 
 
 	figa = []
@@ -259,21 +266,35 @@ def figafind(email, password, group_url, human_emulation_enabled=True,
 						'human_emulation_enabled': human_emulation_enabled,
 						'caching_level': caching_level,
 						'sleep_before_login': process_n * sleep_before_login,
-						'members': processes_members[process_n]
+						'members': processes_members[process_n],
+						
+						# Riutilizziamo l'oggetto che abbiamo già, lo passiamo al 
+						# primo processo
+						'fb': fb if process_n == 0 else None
 						}
 						
 		processes_args.append(process_args)
 
-	logger.debug("Avviando i processi...")
 	
-	# Ogni processo restituisce una lista
-	tmp_figa = pool.map(__filter_process_wrapper, processes_args)
-
-	# Ora le liste di ogni processo devono essere unite
 	figa = []
 	
-	for list_ in tmp_figa:
-		figa += list_
+	# Se c'è un processo solo, chiamiamo direttamente il metodo... 
+	# È utile per il debug, perché le eccezioni nella funzione eseguita con pool.map() 
+	# sono troppo poco dettagliate
+
+	if processes == 1:
+		figa = __filter_process_wrapper(processes_args[0])
+	
+	else:
+		logger.debug("Avviando i processi...")
+		
+		# Ogni processo restituisce una lista
+		tmp_figa = pool.map(__filter_process_wrapper, processes_args)
+	
+		# Ora le liste di ogni processo devono essere unite
+		
+		for list_ in tmp_figa:
+			figa += list_
 
 
 	return figa
