@@ -58,13 +58,14 @@ def __filter_process_wrapper(kwargs):
 	sleep_before_login = kwargs['sleep_before_login']
 	members = kwargs['members']
 	fb = kwargs['fb']
+	gay = kwargs['gay']
 	
 	return __filter_process(email, password, human_emulation_enabled, caching_level,
-							sleep_before_login, members, fb)
+							sleep_before_login, members, fb, gay)
 	
 	
 def __filter_process(email, password, human_emulation_enabled, caching_level, 
-					sleep_before_login, members, fb):
+					sleep_before_login, members, fb, gay):
 						
 	# Tenere sincronizzata descrizone dei parametri con quella di htmlfbapi.Facebook.__init__()
 	# Tenere sincronizzato sleep_before_login con la docstring di Group.get_members() di htmfbapi
@@ -104,6 +105,9 @@ def __filter_process(email, password, human_emulation_enabled, caching_level,
 			In fb si può specificare un oggetto Facebook già esistente se si ha,
 			per evitare un nuovo login.
 			Se è None, verrà creato un nuovo oggetto
+			
+		gay: bool
+			Trasforma FigaFind i CazzoFind :)
 	"""
 	
 	logger.info("Avviata la ricerca delle ragazze, profili da controllare: %s", len(members))
@@ -123,8 +127,11 @@ def __filter_process(email, password, human_emulation_enabled, caching_level,
 		logger.info("Il browser è stato riutilizato")
 
 	# Creiamo il filtro
-	filter_ = fbfilter.FbFilter(filter_rules.FigaFind(), email, password, fb=fb)
-
+	
+	if not gay:
+		filter_ = fbfilter.FbFilter(filter_rules.FigaFind(), email, password, fb=fb)
+	else:
+		filter_ = fbfilter.FbFilter(filter_rules.CazzoFind(), email, password, fb=fb)
 
 	figa = []
 	is_figa = lambda member: filter_.check(member['url'])['ok']
@@ -201,7 +208,8 @@ def __create_sublist(list_, sublist):
 # TODO Gestire meglio human emulation con multiprocessing
 # TODO Assicurarsi che in caso di eccezioni, non perda i profili elaborati
 def figafind(email, password, group_url, human_emulation_enabled=True, 
-			caching_level=caching_levels['safe'], processes=1, sleep_before_login=5):
+			caching_level=caching_levels['safe'], processes=1, sleep_before_login=5,
+			gay=False):
 	# Tenere sincronizzata descrizione del return con quella di __filter_process
 	# Tenere sincronizzata descrizone dei parametri con quella di htmlfbapi.Facebook.__init__()
 	# Tenere sincronizzato sleep_before_login e processes con la docstring di 
@@ -242,6 +250,8 @@ def figafind(email, password, group_url, human_emulation_enabled=True,
 			ma molto probabilmente Facebook vi prenderà a calci in culo e si 
 			bloccherà il programma con un errore di login
 	
+		gay: bool
+			Trasforma FigaFind i CazzoFind :)
 	"""
 	
 	fb = htmlfbapi.Facebook(email, password, human_emulation_enabled, caching_level)
@@ -267,6 +277,7 @@ def figafind(email, password, group_url, human_emulation_enabled=True,
 						'caching_level': caching_level,
 						'sleep_before_login': process_n * sleep_before_login,
 						'members': processes_members[process_n],
+						'gay': gay,
 						
 						# Riutilizziamo l'oggetto che abbiamo già, lo passiamo al 
 						# primo processo
