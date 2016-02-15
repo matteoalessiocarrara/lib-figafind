@@ -61,19 +61,20 @@ class FigaFind(filter_components.FilterRules):
 class CazzoFind(filter_components.FilterRules):
 	
 	def required_property_custom_test(self, profile):
-	# Tenere docstring sincronizzata con quella di
-	# filter_components.FilterRules.required_property_custom_test()
-	"""
-	Controlla se il profilo soddisfa i requisiti richiesti, con dei test 
-	personalizzati
-	Restituisce True o False
+		# Tenere docstring sincronizzata con quella di
+		# filter_components.FilterRules.required_property_custom_test()
+		"""
+		Controlla se il profilo soddisfa i requisiti richiesti, con dei test 
+		personalizzati
+		Restituisce True o False
+		
+		Parametri:
+		
+			profile: lib.htmlfbapi.fbobj.Profile
+				Il profilo da controllare
+		"""
+		
+		ok = (profile.gender['Italiano'] == "Uomo")
 	
-	Parametri:
+		return ok
 	
-		profile: lib.htmlfbapi.fbobj.Profile
-			Il profilo da controllare
-	"""
-	
-	ok = (profile.gender['Italiano'] == "Uomo")
-
-	return ok
