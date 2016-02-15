@@ -19,6 +19,7 @@
 #  MA 02110-1301, USA.
 
 import multiprocessing
+import traceback
 import logging
 import time
 
@@ -110,52 +111,61 @@ def __filter_process(email, password, human_emulation_enabled, caching_level,
 			Trasforma FigaFind i CazzoFind :)
 	"""
 	
-	logger.info("Avviata la ricerca delle ragazze, profili da controllare: %s", len(members))
-	
-	if fb == None:
-		logger.info("Creando un nuovo browser per il processo")
-	
-		# TODO Usare human emulation
-		logger.info("Aspettando %ss prima del login", sleep_before_login)
-		time.sleep(sleep_before_login)
+	try:
+		logger.info("Avviata la ricerca delle ragazze, profili da controllare: %s", len(members))
 		
-		# TODO Usare finestre del browser
-		# Usiamo un nuovo browser per ogni processo, non si può usare lo stesso con
-		# più processi contemporaneamente perché da un qualche errore se si usa https
-		fb = htmlfbapi.Facebook(email, password, human_emulation_enabled, caching_level)
-	else:
-		logger.info("Il browser è stato riutilizato")
-
-	# Creiamo il filtro
-	
-	if not gay:
-		filter_ = fbfilter.FbFilter(filter_rules.FigaFind(), email, password, fb=fb)
-	else:
-		filter_ = fbfilter.FbFilter(filter_rules.CazzoFind(), email, password, fb=fb)
-
-	figa = []
-	is_figa = lambda member: filter_.check(member['url'])['ok']
-	
-	
-	for member in members:
+		if fb == None:
+			logger.info("Creando un nuovo browser per il processo")
 		
-		logger.info("Controllando %s", member['name'])
-		
-		try:
-			if is_figa(member):
-				figa.append(member)
-				logger.info("Ragazza trovata: %s", member['name'])
-				
-		except requests.exceptions.HTTPError as e:
+			# TODO Usare human emulation
+			logger.info("Aspettando %ss prima del login", sleep_before_login)
+			time.sleep(sleep_before_login)
 			
-			# XXX Scrivere meglio
-			if e.message == "500 Server Error: Internal Server Error":
-				logger.warning("Saltato profilo %s: %s", member['url'], e.message) 
-				
-			else:
-				raise
+			# TODO Usare finestre del browser
+			# Usiamo un nuovo browser per ogni processo, non si può usare lo stesso con
+			# più processi contemporaneamente perché da un qualche errore se si usa https
+			fb = htmlfbapi.Facebook(email, password, human_emulation_enabled, caching_level)
+		else:
+			logger.info("Il browser è stato riutilizato")
+	
+		# Creiamo il filtro
+		
+		if not gay:
+			filter_ = fbfilter.FbFilter(filter_rules.FigaFind(), email, password, fb=fb)
+		else:
+			filter_ = fbfilter.FbFilter(filter_rules.CazzoFind(), email, password, fb=fb)
+	
+		figa = []
+		is_figa = lambda member: filter_.check(member['url'])['ok']
+		
+		
+		for member in members:
 			
-	return figa
+			logger.info("Controllando %s", member['name'])
+			
+			try:
+				if is_figa(member):
+					figa.append(member)
+					logger.info("Ragazza trovata: %s", member['name'])
+					
+			except requests.exceptions.HTTPError as e:
+				
+				# XXX Scrivere meglio
+				if e.message == "500 Server Error: Internal Server Error":
+					logger.warning("Saltato profilo %s: %s", member['url'], e.message) 
+					
+				else:
+					raise
+				
+		return figa
+	
+	except Exception as e:
+		
+		# Questo perché se la funzione è eseguita in un processo, in caso di
+		# eccezione non vengono stampate alcune informazioni
+		traceback.print_exc()
+		
+		raise
 
 
 def __create_sublist(list_, sublist):
@@ -281,7 +291,9 @@ def figafind(email, password, group_url, human_emulation_enabled=True,
 						
 						# Riutilizziamo l'oggetto che abbiamo già, lo passiamo al 
 						# primo processo
-						'fb': fb if process_n == 0 else None
+						# HACK FIXME Sembra che con multiprocessing non si possa
+						# passare questo oggetto ad un nuovo processo O.o
+						'fb': fb if processes == 1 else None
 						}
 						
 		processes_args.append(process_args)
